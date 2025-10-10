@@ -4,7 +4,7 @@ app.http("speech-token", {
   methods: ["GET", "POST"],
   authLevel: "anonymous",
   route: "speech-token",
-  handler: async (request, context) => {
+  handler: async (req, context) => {
     try {
       const speechKey = process.env.SPEECH_KEY;
       const speechRegion = process.env.SPEECH_REGION;

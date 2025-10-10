@@ -4,7 +4,8 @@
   "description": "Azure Functions for SpeechTrainer",
   "main": "speech-token/index.js",
   "type": "module",
+  "engines": { "node":">=18"},
   "dependencies": {
-    "@azure/functions": "^4.4.0", "engines": { "node":">=18"}
+    "@azure/functions": "^4.4.0" 
   }
 }
