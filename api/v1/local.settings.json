@@ -3,7 +3,7 @@
   "Values": {
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "FUNCTIONS_WORKER_RUNTIME": "node",
-    "SPEECH_KEY": "<Azure Speech 키>",
+    "SPEECH_KEY": "<Speech key 값>",
     "SPEECH_REGION": "koreacentral",
     "TABLE_CONN": "<Table Storage 연결 문자열>",
     "TABLE_NAME": "PronunResults"
