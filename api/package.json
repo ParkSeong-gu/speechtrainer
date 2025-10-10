@@ -5,6 +5,6 @@
   "main": "speech-token/index.js",
   "type": "module",
   "dependencies": {
-    "node-fetch": "^3.0.0"
+    "@azure/functions": "^4.4.0", "engines": { "node":">=18"}
   }
 }
