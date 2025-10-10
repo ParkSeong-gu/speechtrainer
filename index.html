@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>한국어 발음 평가 데모</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 680px; margin: 24px auto; }
+    .card { border:1px solid #ddd; border-radius:12px; padding:16px; margin:12px 0; }
+    .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    button { padding:8px 14px; border-radius:8px; border:1px solid #ccc; cursor:pointer; }
+    select, input[type=text] { padding:8px; border-radius:8px; border:1px solid #ccc; }
+    pre { background:#fafafa; padding:12px; border-radius:8px; }
+  </style>
+</head>
+<body>
+  <h1>한국어 발음 평가(Pronunciation Assessment)</h1>
+
+  <div class="card">
+    <div class="row">
+      <label for="student">이름 선택:</label>
+      <select id="student">
+        <option value="" selected disabled>이름을 선택하세요</option>
+        <option>어르길</option>
+        <option>뭉흐</option>
+        <option>티무르</option>
+        <option>김천지</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="margin-bottom:8px;">
+      <label for="sentence">읽기 문장:</label>
+      <input id="sentence" type="text" style="flex:1;"
+        value="저는 오늘 한국어 발음 평가 연습을 합니다." />
+    </div>
+    <small>※ 개발 중에는 한 문장으로 시작하고, 나중에 여러 문장/난이도 로테이션 가능</small>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <button id="recordBtn">🎙️ 녹음 & 평가</button>
+      <span id="status">준비 완료</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>평가 결과</h3>
+    <pre id="result">(아직 없음)</pre>
+  </div>
+
+  <script>
+    async function getToken() {
+      const r = await fetch('/api/token'); // Functions의 토큰 브로커
+      if (!r.ok) throw new Error('토큰 발급 실패');
+      return r.json(); // { token, region }
+    }
+
+    function show(obj) {
+      document.getElementById('result').textContent =
+        typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
+    }
+
+    document.getElementById('recordBtn').onclick = async () => {
+      const student = document.getElementById('student').value;
+      if (!student) { alert('이름을 먼저 선택하세요.'); return; }
+
+      const text = document.getElementById('sentence').value.trim();
+      if (!text) { alert('읽을 문장을 입력하세요.'); return; }
+
+      const status = document.getElementById('status');
+      status.textContent = '토큰 발급 중...';
+
+      try {
+        const { token, region } = await getToken();
+
+        // Speech SDK 설정
+        const speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(token, region);
+        speechConfig.speechRecognitionLanguage = "ko-KR";
+
+        // 마이크 입력
+        const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+        const recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
+
+        // 발음 평가 설정(100점, 단어 단위, 오탈자 허용)
+        const paConfig = new SpeechSDK.PronunciationAssessmentConfig(
+          text,
+          SpeechSDK.PronunciationAssessmentGradingSystem.HundredMark,
+          SpeechSDK.PronunciationAssessmentGranularity.Word,
+          /* enableMiscue */ true
+        );
+        // (선택) 참조 텍스트와 실제 발화가 많이 다를 때 처리 정책 등 추가 옵션 가능
+        paConfig.applyTo(recognizer);
+
+        status.textContent = '녹음 중... (한 번 말하면 자동 종료)';
+        recognizer.recognizeOnceAsync(async result => {
+          status.textContent = '평가 완료';
+
+          if (result.reason !== SpeechSDK.ResultReason.RecognizedSpeech) {
+            show({ error: '인식 실패', reason: result.reason });
+            recognizer.close(); return;
+          }
+
+          // 발음평가 결과 파싱
+          const pa = SpeechSDK.PronunciationAssessmentResult.fromResult(result);
+
+          const payload = {
+            student,
+            referenceText: text,
+            recognizedText: result.text,
+            scores: {
+              overall: pa.pronunciationScore,      // 총점
+              accuracy: pa.accuracyScore,          // 정확도
+              fluency: pa.fluencyScore,            // 유창성
+              completeness: pa.completenessScore   // 완전성
+            },
+            words: pa.detailResult?.Words || [],   // 단어별 점수/오류 목록
+            timestamp: new Date().toISOString()
+          };
+
+          // 화면 표시
+          show(payload);
+
+          // 서버에 누적 저장
+          try {
+            const res = await fetch('/api/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            if (!res.ok) console.warn('저장 실패', await res.text());
+          } catch (e) {
+            console.warn('저장 에러', e);
+          }
+
+          recognizer.close();
+        });
+      } catch (e) {
+        status.textContent = '에러';
+        show({ error: e.message || e });
+      }
+    };
+  </script>
+</body>
+</html>
