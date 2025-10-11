@@ -2,9 +2,9 @@
 import { app } from "@azure/functions";
 import { TableClient } from "@azure/data-tables";
 
-app.http('assessments', {
-  methods: ['POST'],
-  authLevel: 'anonymous',
+app.http("assessments", {
+  methods: ["POST"],
+  authLevel: "anonymous",
   handler: async (request, context) => {
     const body = await request.json();
     const { student, referenceText, recognizedText, scores, words, timestamp } = body || {};
