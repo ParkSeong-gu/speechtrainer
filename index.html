@@ -125,7 +125,7 @@
 
           // 서버에 누적 저장
           try {
-            const res = await fetch('/api/assessment', {
+            const res = await fetch('/api/assessments', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload)
