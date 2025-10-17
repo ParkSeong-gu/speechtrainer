@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <title>한국어 발음 평가 데모</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@latest/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle.js"></script>
+  <script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
   <style>
     body { font-family: system-ui, sans-serif; max-width: 680px; margin: 24px auto; }
     .card { border:1px solid #ddd; border-radius:12px; padding:16px; margin:12px 0; }
@@ -51,79 +51,115 @@
     <pre id="result">(아직 없음)</pre>
   </div>
 
-  <script>
-    async function getToken() {
-      const r = await fetch('/api/speech-token'); // Functions의 토큰 브로커
-      if (!r.ok) throw new Error('토큰 발급 실패');
-      return r.json(); // { token, region }
+<script>
+  let recognizer = null;
+  let isRecording = false;
+  let silenceTimer = null;
+
+  async function getToken() {
+    const r = await fetch('/api/speech-token'); // Functions의 토큰 브로커
+    if (!r.ok) throw new Error('토큰 발급 실패');
+    return r.json(); // { token, region }
+  }
+
+  function show(obj) {
+    document.getElementById('result').textContent =
+      typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
+  }
+
+  function setStatus(text) {
+    document.getElementById('status').textContent = text;
+  }
+
+  function setButton(recording) {
+    const btn = document.getElementById('recordBtn');
+    if (recording) {
+      btn.textContent = '■ 중지';
+      btn.disabled = false;
+    } else {
+      btn.textContent = '🎙️ 녹음 & 평가';
+      btn.disabled = false;
     }
+  }
 
-    function show(obj) {
-      document.getElementById('result').textContent =
-        typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
+  function startSilenceTimer(timeoutMs = 3000) {
+    clearSilenceTimer();
+    silenceTimer = setTimeout(() => {
+      // 무음으로 자동 종료
+      stopRecording('무음 감지로 자동 종료');
+    }, timeoutMs);
+  }
+
+  function resetSilenceTimer() {
+    if (isRecording) startSilenceTimer();
+  }
+
+  function clearSilenceTimer() {
+    if (silenceTimer) {
+      clearTimeout(silenceTimer);
+      silenceTimer = null;
     }
+  }
 
-    document.getElementById('recordBtn').onclick = async () => {
-      const student = document.getElementById('student').value;
-      if (!student) { alert('이름을 먼저 선택하세요.'); return; }
+  async function startRecording() {
+    const student = document.getElementById('student').value;
+    if (!student) { alert('이름을 먼저 선택하세요.'); return; }
 
-      const text = document.getElementById('sentence').value.trim();
-      if (!text) { alert('읽을 문장을 입력하세요.'); return; }
+    const text = document.getElementById('sentence').value.trim();
+    if (!text) { alert('읽을 문장을 입력하세요.'); return; }
 
-      const status = document.getElementById('status');
-      status.textContent = '토큰 발급 중...';
+    setStatus('토큰 발급 중...');
+    setButton(true);
 
-      try {
-        const { token, region } = await getToken();
+    try {
+      const { token, region } = await getToken();
 
-        // Speech SDK 설정
-        const speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(token, region);
-        speechConfig.speechRecognitionLanguage = "ko-KR";
+      // Speech SDK 설정
+      const speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(token, region);
+      speechConfig.speechRecognitionLanguage = "ko-KR";
 
-        // 마이크 입력
-        const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
-        const recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
+      // 마이크 입력
+      const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+      recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
 
-        // 발음 평가 설정(100점, 단어 단위, 오탈자 허용)
-        const paConfig = new SpeechSDK.PronunciationAssessmentConfig(
-          text,
-          SpeechSDK.PronunciationAssessmentGradingSystem.HundredMark,
-          SpeechSDK.PronunciationAssessmentGranularity.Word,
-          /* enableMiscue */ true
-        );
-        // (선택) 참조 텍스트와 실제 발화가 많이 다를 때 처리 정책 등 추가 옵션 가능
-        paConfig.applyTo(recognizer);
+      // 발음 평가 설정(100점, 단어 단위, 오탈자 허용)
+      const paConfig = new SpeechSDK.PronunciationAssessmentConfig(
+        text,
+        SpeechSDK.PronunciationAssessmentGradingSystem.HundredMark,
+        SpeechSDK.PronunciationAssessmentGranularity.Word,
+        /* enableMiscue */ true
+      );
+      paConfig.applyTo(recognizer);
 
-        status.textContent = '녹음 중... (한 번 말하면 자동 종료)';
-        recognizer.recognizeOnceAsync(async result => {
-          status.textContent = '평가 완료';
+      // 이벤트 바인딩
+      recognizer.recognizing = (_s, e) => {
+        // 사용자가 말하는 중 — 무음 타이머 리셋
+        resetSilenceTimer();
+      };
 
-          if (result.reason !== SpeechSDK.ResultReason.RecognizedSpeech) {
-            show({ error: '인식 실패', reason: result.reason });
-            recognizer.close(); return;
-          }
-
-          // 발음평가 결과 파싱
-          const pa = SpeechSDK.PronunciationAssessmentResult.fromResult(result);
+      recognizer.recognized = async (_s, e) => {
+        // 최종 인식 결과
+        if (e.result && e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
+          const pa = SpeechSDK.PronunciationAssessmentResult.fromResult(e.result);
 
           const payload = {
             student,
             referenceText: text,
-            recognizedText: result.text,
+            recognizedText: e.result.text,
             scores: {
-              overall: pa.pronunciationScore,      // 총점
-              accuracy: pa.accuracyScore,          // 정확도
-              fluency: pa.fluencyScore,            // 유창성
-              completeness: pa.completenessScore   // 완전성
+              overall: pa.pronunciationScore,
+              accuracy: pa.accuracyScore,
+              fluency: pa.fluencyScore,
+              completeness: pa.completenessScore
             },
-            words: pa.detailResult?.Words || [],   // 단어별 점수/오류 목록
+            words: pa.detailResult?.Words || [],
             timestamp: new Date().toISOString()
           };
 
           // 화면 표시
           show(payload);
 
-          // 서버에 누적 저장
+          // 서버에 누적 저장 (에러는 콘솔 경고로만 처리)
           try {
             const res = await fetch('/api/assessments', {
               method: 'POST',
@@ -131,17 +167,94 @@
               body: JSON.stringify(payload)
             });
             if (!res.ok) console.warn('저장 실패', await res.text());
-          } catch (e) {
-            console.warn('저장 에러', e);
+          } catch (err) {
+            console.warn('저장 에러', err);
           }
 
-          recognizer.close();
-        });
-      } catch (e) {
-        status.textContent = '에러';
-        show({ error: e.message || e });
+          // 한 문장 평가이므로 결과를 받으면 자동 종료
+          stopRecording('평가 완료');
+        } else if (e.result && e.result.reason === SpeechSDK.ResultReason.NoMatch) {
+          // 말했지만 인식이 안 된 경우(무성/작은 볼륨 등)
+          stopRecording('인식 불가(말소리 없음/작음)');
+          show({ error: '인식 실패', reason: 'NoMatch' });
+        }
+      };
+
+      recognizer.canceled = (_s, e) => {
+        // 오류 혹은 사용자 취소
+        if (e.errorDetails) {
+          show({ error: '취소/오류', detail: e.errorDetails });
+        }
+        stopRecording('취소됨');
+      };
+
+      recognizer.sessionStarted = () => {
+        setStatus('녹음 중... (다시 누르면 종료)');
+        isRecording = true;
+        setButton(true);
+        startSilenceTimer(); // 시작과 동시에 무음 타이머 스타트
+      };
+
+      recognizer.sessionStopped = () => {
+        // Azure 쪽에서 세션이 종료되면 안전 종료
+        if (isRecording) stopRecording('세션 종료');
+      };
+
+      // 연속 인식 시작 → 우리가 결과를 받으면 직접 stop 호출
+      recognizer.startContinuousRecognitionAsync();
+
+    } catch (e) {
+      setStatus('에러');
+      setButton(false);
+      show({ error: e.message || e });
+      cleanup();
+    }
+  }
+
+  function stopRecording(reasonText = '중지') {
+    clearSilenceTimer();
+    if (!recognizer) {
+      cleanup();
+      setStatus(reasonText);
+      setButton(false);
+      return;
+    }
+
+    // 연속 인식 종료 요청
+    recognizer.stopContinuousRecognitionAsync(
+      () => {
+        cleanup();
+        setStatus(reasonText);
+        setButton(false);
+      },
+      (err) => {
+        console.warn('stop 실패', err);
+        // 실패해도 강제 정리
+        cleanup();
+        setStatus(reasonText);
+        setButton(false);
       }
-    };
-  </script>
+    );
+  }
+
+  function cleanup() {
+    if (recognizer) {
+      try { recognizer.close(); } catch (_) {}
+      recognizer = null;
+    }
+    isRecording = false;
+    clearSilenceTimer();
+  }
+
+  document.getElementById('recordBtn').onclick = () => {
+    if (isRecording) {
+      // 토글: 녹음 중이면 수동 종료
+      stopRecording('수동 종료');
+    } else {
+      startRecording();
+    }
+  };
+</script>
+
 </body>
 </html>
