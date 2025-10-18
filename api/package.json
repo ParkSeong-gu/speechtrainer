@@ -12,6 +12,6 @@
     "@azure/data-tables": "^13.0.0"
   },
   "devDependencies": {},
-  "main": "src/functions/speech-token.js",
+  "main": "src/functions/*.js",
   "type": "module"
 }
