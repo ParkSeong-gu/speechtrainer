@@ -2,7 +2,7 @@
   "name": "api",
   "version": "1.0.0",
   "description": "function app for SpeechTrainer",
-  "engines": { "node":">=18"},
+  "engines": { "node":">=20.0.0" },
   "scripts": {
     "start": "func start",
     "test": "echo \"No tests yet...\""
