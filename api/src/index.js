@@ -1,2 +1,5 @@
-import "./assessments/save.js";
-import "./speech-token/speech-token.js";
+import { app } from '@azure/functions';
+
+app.setup({
+    enableHttpStream: true,
+});
