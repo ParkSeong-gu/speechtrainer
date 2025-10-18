@@ -1,6 +1,6 @@
 // /api/assessments/index.js
-import { app } from "@azure/functions";
-import { TableClient } from "@azure/data-tables";
+const { app } = require("@azure/functions");
+const { TableClient } = require("@azure/data-tables");
 
 app.http("assessments", {
   methods: ["POST"],
