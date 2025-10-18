@@ -12,5 +12,6 @@
     "@azure/data-tables": "^13.0.0"
   },
   "devDependencies": {},
-  "main": "src/{index.js,functions/*.js}"
+  "main": "src/{index.js,functions/*.js}",
+  "type": "module"
 }
