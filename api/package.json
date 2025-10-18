@@ -12,6 +12,6 @@
     "@azure/data-tables": "^13.0.0"
   },
   "devDependencies": {},
-  "main": "src/functions/save.js",
+  "main": "src/functions/",
   "type": "module"
 }
