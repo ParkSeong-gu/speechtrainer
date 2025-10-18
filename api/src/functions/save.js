@@ -43,4 +43,7 @@ app.http("assessments", {
       return { status: 500, body: "Failed to save data." };
     }
   }
-};
+}
+
+);
+
