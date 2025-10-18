@@ -1,12 +1,14 @@
 {
   "name": "api",
   "version": "1.0.0",
-  "description": "Azure Functions for SpeechTrainer",
-  "main": "index.js",
-  "type": "module",
-  "engines": { "node":">=18"},
+  "description": "",
+  "scripts": {
+    "start": "func start",
+    "test": "echo \"No tests yet...\""
+  },
   "dependencies": {
-    "@azure/functions": "^4.4.0",
-    "@azure/data-tables": "^13.0.0"
-  }
+    "@azure/functions": "^4.0.0"
+  },
+  "devDependencies": {},
+  "main": "src/{index.js,functions/*.js}"
 }
