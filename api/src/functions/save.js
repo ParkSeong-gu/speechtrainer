@@ -5,6 +5,7 @@ const { TableClient } = require("@azure/data-tables");
 app.http("assessments", {
   methods: ["POST"],
   authLevel: "anonymous",
+  route: "assessments",
   handler: async (request, context) => {
     const body = await request.json();
     const { student, referenceText, recognizedText, scores, words, timestamp } = body || {};
@@ -43,7 +44,5 @@ app.http("assessments", {
       return { status: 500, body: "Failed to save data." };
     }
   }
-}
-
-);
+});
 
